@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { FeedbackData } from './types';
 import QuestionCard from './components/QuestionCard';
-import { saveFeedback, getHistory } from './services/storageService';
+import { saveFeedback, getHistory, initStudent } from './services/storageService';
 import { analyzeFeedback } from './services/geminiService';
 import { sendAnalysisToAdmin } from './services/emailService';
 import jsQR from 'jsqr';
@@ -143,9 +143,14 @@ const App: React.FC = () => {
   }, [formData]);
 
   useEffect(() => {
-    const history = getHistory();
-    setCompletedSubjects(history.filter(e => e.subject !== 'ENVIRONNEMENT_GLOBAL').map(e => e.subject));
-    setEnvAuditDone(history.some(e => e.subject === 'ENVIRONNEMENT_GLOBAL'));
+    // Init student and load history
+    const init = async () => {
+      await initStudent();
+      const history = await getHistory();
+      setCompletedSubjects(history.filter(e => e.subject !== 'ENVIRONNEMENT_GLOBAL').map(e => e.subject));
+      setEnvAuditDone(history.some(e => e.subject === 'ENVIRONNEMENT_GLOBAL'));
+    };
+    init();
   }, [step]);
 
   const progressStats = useMemo(() => {
@@ -190,7 +195,8 @@ const App: React.FC = () => {
     }
     setStep('submitting');
     try {
-      const id = saveFeedback(formData);
+      const studentId = await initStudent();
+      const id = await saveFeedback(formData, studentId);
       setLastSubmissionId(id);
       const analysis = await analyzeFeedback(formData);
       await sendAnalysisToAdmin(formData, analysis);
@@ -295,8 +301,8 @@ const App: React.FC = () => {
                 const isProgress = status === 'En cours';
                 return (
                   <button key={s} onClick={() => !isDone && startPedagogy(s)} className={`p-5 rounded-3xl border transition-all text-left group flex flex-col gap-3 h-full ${isDone ? 'bg-emerald-500/5 border-emerald-500/30' :
-                      isProgress ? 'bg-indigo-500/10 border-indigo-500/50 ring-1 ring-indigo-500/20' :
-                        'bg-slate-950/40 border-slate-800 hover:border-slate-600'
+                    isProgress ? 'bg-indigo-500/10 border-indigo-500/50 ring-1 ring-indigo-500/20' :
+                      'bg-slate-950/40 border-slate-800 hover:border-slate-600'
                     }`}>
                     <div className="flex items-center justify-between">
                       {isDone ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : isProgress ? <Clock className="w-4 h-4 text-indigo-400 animate-pulse" /> : <Circle className="w-4 h-4 text-slate-700" />}

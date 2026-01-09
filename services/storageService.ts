@@ -1,4 +1,4 @@
-import { supabase } from '../supabaseClient';
+import { supabase, isSupabaseConfigured } from '../supabaseClient';
 import { FeedbackData, FeedbackEntry, GlobalStats, EnvironmentStats } from "../types";
 
 const DEVICE_ID_KEY = "isgi_student_device_id";
@@ -15,6 +15,7 @@ const getDeviceId = (): string => {
 
 // Initialize student - ensures exists in DB
 export const initStudent = async (): Promise<string> => {
+  if (!isSupabaseConfigured) return "offline-mode";
   const deviceId = getDeviceId();
 
   // Check if student exists

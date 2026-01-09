@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { FeedbackData } from './types';
 import QuestionCard from './components/QuestionCard';
 import { saveFeedback, getHistory, initStudent } from './services/storageService';
+import { isSupabaseConfigured } from './supabaseClient';
 import { analyzeFeedback } from './services/geminiService';
 import { sendAnalysisToAdmin } from './services/emailService';
 import jsQR from 'jsqr';
@@ -137,6 +138,23 @@ const App: React.FC = () => {
       return initialFormData;
     }
   });
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-slate-300">
+        <ShieldAlert className="w-20 h-20 text-indigo-500 mb-6" />
+        <h1 className="text-3xl font-black text-white uppercase mb-4">Configuration Requise</h1>
+        <p className="max-w-md text-sm mb-8">L'application ne peut pas démarrer car les variables d'environnement Supabase sont manquantes.</p>
+        <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 text-left w-full max-w-lg">
+          <p className="text-xs font-mono text-indigo-400 mb-2">// Vercel Settings &gt; Environment Variables</p>
+          <ul className="space-y-2 font-mono text-xs text-slate-400">
+            <li>VITE_SUPABASE_URL</li>
+            <li>VITE_SUPABASE_ANON_KEY</li>
+          </ul>
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));

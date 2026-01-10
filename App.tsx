@@ -1,120 +1,35 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FeedbackData } from './types';
 import QuestionCard from './components/QuestionCard';
+import QRScanner from './components/QRScanner';
+import AdminDashboard from './components/AdminDashboard';
 import { saveFeedback, getHistory, initStudent } from './services/storageService';
 import { isSupabaseConfigured } from './supabaseClient';
 import { analyzeFeedback } from './services/geminiService';
 import { sendAnalysisToAdmin } from './services/emailService';
-import jsQR from 'jsqr';
 import {
   Factory, CheckCircle2,
   Target, MessageSquare, BookOpen, Award,
   ShieldCheck, MapPin, Truck, HelpCircle,
   Menu, X, Lock, Info,
-  Book, Building2, ArrowLeft,
-  Zap, Play, QrCode, Camera, RefreshCw,
+  Building2, ArrowLeft,
+  Zap, QrCode, RefreshCw,
   Circle, Clock, CheckCircle, Activity,
   ShieldAlert, Laptop, ArrowRight,
   TrendingUp, LayoutDashboard,
-  Flame, Sparkles
+  Sparkles
 } from 'lucide-react';
 
-type AppStep = 'welcome' | 'hub' | 'scanner' | 'modules' | 'form_pedagogy' | 'form_env' | 'submitting' | 'thanks';
+type AppStep = 'welcome' | 'hub' | 'scanner' | 'admin_login' | 'admin_dash' | 'form_pedagogy' | 'form_env' | 'submitting' | 'thanks';
 
 const GI_SUBJECTS = [
-  "Algèbre 1",
-  "Algorithmique et Programmation C",
-  "Analyse 1",
-  "Anglais 1",
-  "Circuits Électriques",
-  "Circuits Électroniques",
-  "Environnement Informatique",
-  "Français 1",
-  "Introduction au Génie Industriel",
-  "Mécanique générale",
+  "Algèbre 1", "Algorithmique et Programmation C", "Analyse 1", "Anglais 1",
+  "Circuits Électriques", "Circuits Électroniques", "Environnement Informatique",
+  "Français 1", "Introduction au Génie Industriel", "Mécanique générale",
   "Probabilités et Statistiques"
 ];
 
 const DRAFT_KEY = "isgi_feedback_draft_v2";
-
-const QRScanner: React.FC<{ onScan: (data: string) => void; onClose: () => void }> = ({ onScan, onClose }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let stream: MediaStream | null = null;
-    let animationFrameId: number;
-
-    const startCamera = async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.setAttribute("playsinline", "true");
-          videoRef.current.play();
-          requestAnimationFrame(tick);
-        }
-      } catch (err) {
-        setError("Accès caméra refusé. Veuillez autoriser l'accès pour scanner les codes modules.");
-      }
-    };
-
-    const tick = () => {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          canvas.height = video.videoHeight;
-          canvas.width = video.videoWidth;
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height);
-          if (code) onScan(code.data);
-        }
-      }
-      animationFrameId = requestAnimationFrame(tick);
-    };
-
-    startCamera();
-    return () => {
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [onScan]);
-
-  return (
-    <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col">
-      <div className="p-6 flex items-center justify-between border-b border-slate-900 glass-panel">
-        <h3 className="font-black text-xs uppercase tracking-[0.3em] text-white flex items-center gap-3">
-          <Camera className="w-4 h-4 text-indigo-400" /> Scanner Module ISGI
-        </h3>
-        <button onClick={onClose} className="p-2 hover:bg-slate-900 rounded-xl transition-colors"><X className="w-6 h-6 text-slate-500" /></button>
-      </div>
-      <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
-        {error ? (
-          <div className="text-center p-8 max-w-xs">
-            <ShieldAlert className="w-12 h-12 text-red-500 mx-auto mb-4" />
-            <p className="text-red-500 font-black uppercase text-[10px] tracking-widest leading-relaxed">{error}</p>
-          </div>
-        ) : (
-          <video ref={videoRef} className="h-full w-full object-cover opacity-60" />
-        )}
-        <canvas ref={canvasRef} className="hidden" />
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-72 h-72 border-2 border-indigo-500/50 rounded-3xl relative">
-            <div className="scanline"></div>
-            <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-indigo-400 rounded-tl-xl"></div>
-            <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-indigo-400 rounded-tr-xl"></div>
-            <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-indigo-400 rounded-bl-xl"></div>
-            <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-indigo-400 rounded-br-xl"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const App: React.FC = () => {
   const [step, setStep] = useState<AppStep>('welcome');
@@ -123,6 +38,8 @@ const App: React.FC = () => {
   const [completedSubjects, setCompletedSubjects] = useState<string[]>([]);
   const [envAuditDone, setEnvAuditDone] = useState(false);
   const [lastSubmissionId, setLastSubmissionId] = useState('');
+  const [adminPass, setAdminPass] = useState('');
+  const [adminError, setAdminError] = useState(false);
 
   const initialFormData: FeedbackData = {
     subject: '', q1: null, q2: null, q3: null, q4: null, q5: null,
@@ -161,7 +78,6 @@ const App: React.FC = () => {
   }, [formData]);
 
   useEffect(() => {
-    // Init student and load history
     const init = async () => {
       await initStudent();
       const history = await getHistory();
@@ -186,29 +102,23 @@ const App: React.FC = () => {
     return 'À faire';
   };
 
-  const startPedagogy = (subject: string) => {
-    if (formData.subject !== subject) {
-      setFormData({ ...initialFormData, subject });
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPass === 'ADMIN2026') {
+      setStep('admin_dash');
+      setSidebarOpen(false);
+      setAdminPass('');
+      setAdminError(false);
+    } else {
+      setAdminError(true);
+      setTimeout(() => setAdminError(false), 2000);
     }
-    setStep('form_pedagogy');
-    setShowValidationErrors(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const startEnvAudit = () => {
-    if (formData.subject !== 'ENVIRONNEMENT_GLOBAL') {
-      setFormData({ ...initialFormData, subject: 'ENVIRONNEMENT_GLOBAL' });
-    }
-    setStep('form_env');
-    setShowValidationErrors(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (progressStats.completed < 5) {
       setShowValidationErrors(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     setStep('submitting');
@@ -216,8 +126,10 @@ const App: React.FC = () => {
       const studentId = await initStudent();
       const id = await saveFeedback(formData, studentId);
       setLastSubmissionId(id);
-      const analysis = await analyzeFeedback(formData);
-      await sendAnalysisToAdmin(formData, analysis);
+      try {
+        const analysis = await analyzeFeedback(formData);
+        await sendAnalysisToAdmin(formData, analysis);
+      } catch (err) { console.error("AI/Email failed:", err); }
       localStorage.removeItem(DRAFT_KEY);
       setFormData(initialFormData);
       setStep('thanks');
@@ -226,16 +138,17 @@ const App: React.FC = () => {
     }
   };
 
-  const totalStepsCount = GI_SUBJECTS.length + 1; // 12 étapes
+  // UI Helpers
+  const totalStepsCount = GI_SUBJECTS.length + 1;
   const currentProgressCount = completedSubjects.length + (envAuditDone ? 1 : 0);
   const globalProgression = Math.round((currentProgressCount / totalStepsCount) * 100);
   const firstUncompleted = GI_SUBJECTS.find(s => !completedSubjects.includes(s));
 
   return (
     <div className="min-h-screen text-slate-100 pb-20 selection:bg-indigo-500/30">
-      {step === 'scanner' && <QRScanner onScan={(d) => { const s = GI_SUBJECTS.find(x => d.includes(x)); if (s) startPedagogy(s); }} onClose={() => setStep('hub')} />}
+      {step === 'scanner' && <QRScanner onScan={(d) => { const s = GI_SUBJECTS.find(x => d.includes(x)); if (s) setStep('form_pedagogy'); }} onClose={() => setStep('hub')} />}
 
-      {/* Sidebar Admin Simulé */}
+      {/* Sidebar Admin Access */}
       <div className={`fixed inset-y-0 left-0 z-[150] bg-slate-950 border-r border-slate-900 transform transition-all duration-500 shadow-2xl flex flex-col w-80 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 flex items-center justify-between border-b border-slate-900">
           <div className="flex items-center gap-2">
@@ -244,9 +157,25 @@ const App: React.FC = () => {
           </div>
           <button onClick={() => setSidebarOpen(false)} className="p-2 hover:bg-slate-900 rounded-xl transition-colors"><X className="w-5 h-5 text-slate-500" /></button>
         </div>
-        <div className="flex-1 p-6 flex flex-col justify-center items-center text-center space-y-6">
-          <Lock className="w-12 h-12 text-slate-800" />
-          <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest leading-relaxed">Accès réservé à la direction des études.</p>
+
+        <div className="flex-1 p-8 flex flex-col justify-center gap-8">
+          <div className="text-center space-y-4">
+            <Lock className={`w-12 h-12 mx-auto transition-all ${adminError ? 'text-red-500 animate-bounce' : 'text-slate-700'}`} />
+            <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest leading-relaxed">Accès Réservé</p>
+          </div>
+
+          <form onSubmit={handleAdminLogin} className="space-y-4">
+            <input
+              type="password"
+              placeholder="Code d'accès"
+              className={`w-full bg-slate-900 border-2 rounded-2xl p-4 text-center font-mono outline-none transition-all ${adminError ? 'border-red-500 text-red-500' : 'border-slate-800 focus:border-indigo-500 text-white'}`}
+              value={adminPass}
+              onChange={(e) => setAdminPass(e.target.value)}
+            />
+            <button className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase text-xs tracking-widest rounded-2xl transition-all">
+              Déverrouiller
+            </button>
+          </form>
         </div>
       </div>
 
@@ -260,7 +189,7 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-8">
+      <main className="max-w-4xl mx-auto px-6 py-8">
         {step === 'welcome' && (
           <div className="py-20 text-center space-y-12 animate-in fade-in duration-700">
             <div className="relative inline-block">
@@ -277,7 +206,6 @@ const App: React.FC = () => {
 
         {step === 'hub' && (
           <div className="space-y-10 animate-in slide-in-from-bottom-6 duration-500">
-            {/* Bannière de Progression Globale (12 étapes) */}
             <div className="bg-slate-900/60 border-2 border-slate-800 rounded-[48px] p-8 md:p-10 shadow-2xl relative overflow-hidden">
               <div className="absolute -right-10 -top-10 opacity-10 pointer-events-none">
                 <TrendingUp size={240} className="text-indigo-400" />
@@ -288,7 +216,6 @@ const App: React.FC = () => {
                   <h2 className="text-5xl md:text-7xl font-black text-white italic tracking-tighter uppercase leading-none">
                     {currentProgressCount} <span className="text-slate-700">/ {totalStepsCount}</span>
                   </h2>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{totalStepsCount - currentProgressCount} étapes restantes</p>
                 </div>
                 <div className="flex-1 max-w-sm w-full space-y-4">
                   <div className="flex justify-between items-end px-1">
@@ -311,20 +238,18 @@ const App: React.FC = () => {
               <button onClick={() => setStep('scanner')} className="p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all"><QrCode className="w-6 h-6" /></button>
             </div>
 
-            {/* Grille des modules académiques */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {GI_SUBJECTS.map((s) => {
                 const status = getSubjectStatus(s);
                 const isDone = status === 'Terminé';
                 const isProgress = status === 'En cours';
                 return (
-                  <button key={s} onClick={() => !isDone && startPedagogy(s)} className={`p-5 rounded-3xl border transition-all text-left group flex flex-col gap-3 h-full ${isDone ? 'bg-emerald-500/5 border-emerald-500/30' :
+                  <button key={s} onClick={() => !isDone && (setFormData({ ...initialFormData, subject: s }), setStep('form_pedagogy'))} className={`p-5 rounded-3xl border transition-all text-left group flex flex-col gap-3 h-full ${isDone ? 'bg-emerald-500/5 border-emerald-500/30' :
                     isProgress ? 'bg-indigo-500/10 border-indigo-500/50 ring-1 ring-indigo-500/20' :
                       'bg-slate-950/40 border-slate-800 hover:border-slate-600'
                     }`}>
                     <div className="flex items-center justify-between">
                       {isDone ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : isProgress ? <Clock className="w-4 h-4 text-indigo-400 animate-pulse" /> : <Circle className="w-4 h-4 text-slate-700" />}
-                      <span className={`text-[8px] font-black uppercase tracking-tighter ${isDone ? 'text-emerald-400' : isProgress ? 'text-indigo-400' : 'text-slate-600'}`}>{status}</span>
                     </div>
                     <p className={`text-[10px] font-black uppercase leading-tight line-clamp-2 ${isDone ? 'text-emerald-100' : isProgress ? 'text-indigo-100' : 'text-slate-400 group-hover:text-white'}`}>{s}</p>
                   </button>
@@ -332,19 +257,17 @@ const App: React.FC = () => {
               })}
             </div>
 
-            {/* Audit Environnemental & Actions Globales */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-12">
-              <button onClick={startEnvAudit} className={`p-10 rounded-[40px] border-2 transition-all text-left group flex flex-col justify-between h-64 ${envAuditDone ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-slate-900/40 border-slate-800 hover:border-emerald-500/50'}`}>
-                <Building2 className={`w-12 h-12 transition-transform group-hover:scale-110 ${envAuditDone ? 'text-emerald-400' : 'text-slate-600'}`} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <button onClick={() => (setFormData({ ...initialFormData, subject: 'ENVIRONNEMENT_GLOBAL' }), setStep('form_env'))} className={`p-10 rounded-[40px] border-2 transition-all text-left group flex flex-col justify-between h-64 ${envAuditDone ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-slate-900/40 border-slate-800 hover:border-emerald-500/50'}`}>
+                <Building2 className={`w-12 h-12 ${envAuditDone ? 'text-emerald-400' : 'text-slate-600'}`} />
                 <div>
                   <h3 className="text-2xl font-black uppercase text-white">Environnement</h3>
-                  <p className={`text-[10px] font-black uppercase tracking-[0.3em] mt-2 ${envAuditDone ? 'text-emerald-400' : 'text-slate-500'}`}>{envAuditDone ? 'Audit Clôturé' : 'Audit Infrastructure & Logistique'}</p>
+                  <p className={`text-[10px] font-black uppercase tracking-[0.3em] mt-2 ${envAuditDone ? 'text-emerald-400' : 'text-slate-500'}`}>{envAuditDone ? 'Audit Clôturé' : 'Infrastructure'}</p>
                 </div>
               </button>
-
               {firstUncompleted && (
-                <button onClick={() => startPedagogy(firstUncompleted)} className="p-10 rounded-[40px] bg-indigo-600 border-2 border-indigo-500 hover:bg-indigo-500 transition-all text-left group flex flex-col justify-between h-64 shadow-2xl">
-                  <Zap className="text-white w-12 h-12 group-hover:rotate-12 transition-transform" />
+                <button onClick={() => (setFormData({ ...initialFormData, subject: firstUncompleted }), setStep('form_pedagogy'))} className="p-10 rounded-[40px] bg-indigo-600 border-2 border-indigo-500 hover:bg-indigo-500 transition-all text-left group flex flex-col justify-between h-64 shadow-2xl">
+                  <Zap className="text-white w-12 h-12" />
                   <div>
                     <h3 className="text-2xl font-black text-white uppercase leading-none">Prochaine Étape</h3>
                     <p className="text-[10px] font-bold text-indigo-100 uppercase mt-2 tracking-widest truncate">{firstUncompleted}</p>
@@ -355,11 +278,13 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {step === 'admin_dash' && <AdminDashboard onBack={() => setStep('hub')} />}
+
         {(step === 'form_pedagogy' || step === 'form_env') && (
-          <form onSubmit={handleFormSubmit} className="space-y-10 pb-40 animate-in slide-in-from-bottom-10 duration-500">
-            <div className="flex items-center gap-4 mb-4">
+          <form onSubmit={handleFormSubmit} className="space-y-10 animate-in slide-in-from-bottom-10 duration-500">
+            <div className="flex items-center gap-4">
               <button type="button" onClick={() => setStep('hub')} className="p-3 bg-slate-900 rounded-xl text-slate-500 hover:text-white transition-colors"><ArrowLeft className="w-5 h-5" /></button>
-              <h2 className="text-3xl font-black uppercase italic text-white leading-tight truncate">{formData.subject === 'ENVIRONNEMENT_GLOBAL' ? 'Cadre de Vie' : formData.subject}</h2>
+              <h2 className="text-3xl font-black uppercase italic text-white truncate">{formData.subject === 'ENVIRONNEMENT_GLOBAL' ? 'Audit Cadre de Vie' : formData.subject}</h2>
             </div>
 
             <div className="space-y-6">
@@ -384,12 +309,10 @@ const App: React.FC = () => {
 
             <div className="p-10 bg-slate-900/40 rounded-[48px] border-2 border-slate-800 glass-panel">
               <label className="text-xs font-black uppercase text-slate-500 tracking-[0.2em] block mb-6">Observations libres</label>
-              <textarea value={formData.comments} onChange={e => setFormData({ ...formData, comments: e.target.value })} placeholder="Suggestions d'amélioration..." className="w-full h-40 bg-slate-950 border-2 border-slate-800 rounded-3xl p-8 text-sm focus:border-indigo-500 outline-none transition-all" />
+              <textarea value={formData.comments} onChange={e => setFormData({ ...formData, comments: e.target.value })} placeholder="Suggestions..." className="w-full h-40 bg-slate-950 border-2 border-slate-800 rounded-3xl p-8 text-sm focus:border-indigo-500 outline-none transition-all" />
             </div>
 
-            <div className="sticky bottom-6 px-4">
-              <button type="submit" className="w-full py-12 bg-emerald-600 hover:bg-emerald-500 rounded-[50px] font-black uppercase tracking-[0.5em] text-white shadow-2xl border-b-8 border-emerald-800 transition-all hover:scale-[1.02] active:translate-y-2">Soumettre le Diagnostic</button>
-            </div>
+            <button type="submit" className="w-full py-12 bg-emerald-600 hover:bg-emerald-500 rounded-[50px] font-black uppercase tracking-[0.5em] text-white shadow-2xl border-b-8 border-emerald-800 transition-all hover:scale-[1.02] active:translate-y-2">Soumettre le Diagnostic</button>
           </form>
         )}
 
@@ -414,9 +337,8 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="py-12 text-center opacity-30 border-t border-slate-900/50 mt-20">
-        <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.6em] mb-2">ISGI • Génie Industriel</p>
-        <p className="text-[8px] font-mono text-slate-800 uppercase tracking-widest">Système d'Audit Qualité Académique</p>
+      <footer className="py-12 text-center opacity-30 mt-20">
+        <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.6em]">ISGI • Génie Industriel</p>
       </footer>
     </div>
   );

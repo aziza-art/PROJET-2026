@@ -2,10 +2,12 @@ export type RatingValue = number | string | null;
 
 export type FeedbackType = 'module' | 'global_env';
 
+export type SentimentType = 'positif' | 'neutre' | 'negatif';
+
 export interface AnalysisResult {
   summary: string;
   recommendations: string[];
-  sentiment: string;
+  sentiment: SentimentType;
 }
 
 export interface FeedbackData {

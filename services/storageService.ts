@@ -96,7 +96,7 @@ export const getHistory = async (studentId?: string): Promise<FeedbackEntry[]> =
     return [];
   }
 
-  return data.map((item: any) => ({
+  return (data || []).map((item) => ({
     ...item,
     timestamp: new Date(item.created_at).toLocaleString('fr-FR'),
   })) as FeedbackEntry[];

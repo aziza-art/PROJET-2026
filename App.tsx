@@ -40,6 +40,7 @@ const App: React.FC = () => {
   const [lastSubmissionId, setLastSubmissionId] = useState('');
   const [adminPass, setAdminPass] = useState('');
   const [adminError, setAdminError] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
 
   const initialFormData: FeedbackData = {
     subject: '', q1: null, q2: null, q3: null, q4: null, q5: null,
@@ -122,6 +123,7 @@ const App: React.FC = () => {
       return;
     }
     setStep('submitting');
+    setSubmissionError(null);
     try {
       const studentId = await initStudent();
       const id = await saveFeedback(formData, studentId);
@@ -133,8 +135,10 @@ const App: React.FC = () => {
       localStorage.removeItem(DRAFT_KEY);
       setFormData(initialFormData);
       setStep('thanks');
-    } catch {
-      setStep('thanks');
+    } catch (err: any) {
+      console.error("Submission failed:", err);
+      setSubmissionError(err.message || "Erreur lors de l'enregistrement en base de données.");
+      setStep('form_pedagogy'); // Go back to allow retry
     }
   };
 
@@ -286,6 +290,16 @@ const App: React.FC = () => {
               <button type="button" onClick={() => setStep('hub')} className="p-3 bg-slate-900 rounded-xl text-slate-500 hover:text-white transition-colors"><ArrowLeft className="w-5 h-5" /></button>
               <h2 className="text-3xl font-black uppercase italic text-white truncate">{formData.subject === 'ENVIRONNEMENT_GLOBAL' ? 'Audit Cadre de Vie' : formData.subject}</h2>
             </div>
+
+            {submissionError && (
+              <div className="p-6 bg-red-500/10 border-2 border-red-500/50 rounded-3xl flex items-center gap-4 animate-in fade-in slide-in-from-top-4">
+                <ShieldAlert className="w-8 h-8 text-red-500 shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-xs font-black uppercase tracking-widest text-red-500">Erreur de Synchronisation</p>
+                  <p className="text-sm text-red-200/80">{submissionError}</p>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-6">
               {step === 'form_pedagogy' ? (

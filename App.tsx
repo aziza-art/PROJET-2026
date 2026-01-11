@@ -81,13 +81,14 @@ const App: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        await initStudent();
-        const history = await getHistory();
+        const studentId = await initStudent();
+        // Pass studentId to getHistory to see ONLY our progress
+        const history = await getHistory(studentId);
         setCompletedSubjects(history.filter(e => e.subject !== 'ENVIRONNEMENT_GLOBAL').map(e => e.subject));
         setEnvAuditDone(history.some(e => e.subject === 'ENVIRONNEMENT_GLOBAL'));
       } catch (err: any) {
         console.error("Startup failed:", err);
-        setSubmissionError("Impossible de se connecter à la base de données. " + (err.message || ""));
+        setSubmissionError("Problème de connexion: " + (err.message || "Tentative de reconnexion..."));
       }
     };
     init();
@@ -251,8 +252,18 @@ const App: React.FC = () => {
               <h2 className="text-3xl font-black uppercase italic leading-none flex items-center gap-3">
                 <LayoutDashboard className="w-6 h-6 text-indigo-400" /> Console Étudiant
               </h2>
-              <button onClick={() => setStep('scanner')} className="p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all"><QrCode className="w-6 h-6" /></button>
+              <div className="flex gap-3">
+                <button onClick={() => setStep('welcome')} className="p-4 bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 hover:text-white transition-all"><RefreshCw className="w-6 h-6" /></button>
+                <button onClick={() => setStep('scanner')} className="p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all"><QrCode className="w-6 h-6" /></button>
+              </div>
             </div>
+
+            {submissionError && (
+              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center gap-3 animate-in slide-in-from-top-4">
+                <ShieldAlert className="w-5 h-5 text-red-500" />
+                <p className="text-xs font-bold text-red-200">{submissionError}</p>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {GI_SUBJECTS.map((s) => {

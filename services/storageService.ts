@@ -102,7 +102,9 @@ export const saveFeedback = async (data: FeedbackData, studentId: string): Promi
 // Fetch history. If studentId is provided, returns specific student history.
 // If no studentId, implied Admin view (all history).
 export const getHistory = async (studentId?: string): Promise<FeedbackEntry[]> => {
-  let query = supabase.from('feedbacks').select('*').order('created_at', { ascending: false });
+  let query = supabase.from('feedbacks')
+    .select('*')
+    .order('created_at', { ascending: false });
 
   if (studentId) {
     query = query.eq('student_id', studentId);
@@ -111,8 +113,8 @@ export const getHistory = async (studentId?: string): Promise<FeedbackEntry[]> =
   const { data, error } = await query;
 
   if (error) {
-    console.error("Error fetching history:", error);
-    return [];
+    console.error("Supabase History Fetch Error:", error);
+    throw new Error(`Erreur récupération historique: ${error.message}`);
   }
 
   return (data || []).map((item) => ({

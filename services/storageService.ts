@@ -6,7 +6,11 @@ const DEVICE_ID_KEY = "isgi_student_device_id";
 // Helper to get or create a persistent device ID
 const getDeviceId = (): string => {
   let deviceId = localStorage.getItem(DEVICE_ID_KEY);
-  if (!deviceId) {
+
+  // Validate UUID format to prevent DB errors
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  if (!deviceId || !uuidRegex.test(deviceId)) {
     deviceId = crypto.randomUUID();
     localStorage.setItem(DEVICE_ID_KEY, deviceId);
   }
@@ -18,26 +22,34 @@ export const initStudent = async (): Promise<string> => {
   if (!isSupabaseConfigured) return "offline-mode";
   const deviceId = getDeviceId();
 
-  // Check if student exists
-  const { data: existing } = await supabase
-    .from('students')
-    .select('id')
-    .eq('device_id', deviceId)
-    .single();
+  try {
+    // Check if student exists
+    const { data: existing, error: selectError } = await supabase
+      .from('students')
+      .select('id')
+      .eq('device_id', deviceId)
+      .maybeSingle(); // Use maybeSingle to avoid error on 0 rows
 
-  if (existing) {
-    return existing.id;
+    if (existing) return existing.id;
+
+    // Create new student
+    const { data: newStudent, error: insertError } = await supabase
+      .from('students')
+      .insert({ device_id: deviceId })
+      .select('id')
+      .single();
+
+    if (insertError) {
+      console.error("Supabase Student Insert Error:", insertError);
+      throw new Error(`Erreur Student: ${insertError.message}`);
+    }
+
+    if (!newStudent) throw new Error('Impossible de créer le profil étudiant.');
+    return newStudent.id;
+  } catch (err: any) {
+    console.error("Init Student Fatal Error:", err);
+    throw err;
   }
-
-  // Create new student
-  const { data: newStudent, error } = await supabase
-    .from('students')
-    .insert({ device_id: deviceId })
-    .select('id')
-    .single();
-
-  if (error || !newStudent) throw error || new Error('Failed to create student');
-  return newStudent.id;
 };
 
 // Get total unique students count
@@ -51,6 +63,8 @@ export const getTotalStudents = async (): Promise<number> => {
 };
 
 export const saveFeedback = async (data: FeedbackData, studentId: string): Promise<string> => {
+  if (!data.subject) throw new Error("Le sujet de l'audit est manquant.");
+
   try {
     const { data: inserted, error } = await supabase
       .from('feedbacks')
@@ -72,9 +86,14 @@ export const saveFeedback = async (data: FeedbackData, studentId: string): Promi
       .select('id')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase Save Error:", error);
+      throw new Error(`Erreur Base de Données: ${error.message} (Code: ${error.code})`);
+    }
+
+    if (!inserted) throw new Error("Aucune réponse du serveur lors de l'enregistrement.");
     return inserted.id;
-  } catch (e) {
+  } catch (e: any) {
     console.error("Error saving feedback:", e);
     throw e;
   }

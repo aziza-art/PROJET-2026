@@ -80,10 +80,15 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
-      await initStudent();
-      const history = await getHistory();
-      setCompletedSubjects(history.filter(e => e.subject !== 'ENVIRONNEMENT_GLOBAL').map(e => e.subject));
-      setEnvAuditDone(history.some(e => e.subject === 'ENVIRONNEMENT_GLOBAL'));
+      try {
+        await initStudent();
+        const history = await getHistory();
+        setCompletedSubjects(history.filter(e => e.subject !== 'ENVIRONNEMENT_GLOBAL').map(e => e.subject));
+        setEnvAuditDone(history.some(e => e.subject === 'ENVIRONNEMENT_GLOBAL'));
+      } catch (err: any) {
+        console.error("Startup failed:", err);
+        setSubmissionError("Impossible de se connecter à la base de données. " + (err.message || ""));
+      }
     };
     init();
   }, [step]);
@@ -139,6 +144,7 @@ const App: React.FC = () => {
       console.error("Submission failed:", err);
       setSubmissionError(err.message || "Erreur lors de l'enregistrement en base de données.");
       setStep('form_pedagogy'); // Go back to allow retry
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -150,7 +156,13 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen text-slate-100 pb-20 selection:bg-indigo-500/30">
-      {step === 'scanner' && <QRScanner onScan={(d) => { const s = GI_SUBJECTS.find(x => d.includes(x)); if (s) setStep('form_pedagogy'); }} onClose={() => setStep('hub')} />}
+      {step === 'scanner' && <QRScanner onScan={(d) => {
+        const s = GI_SUBJECTS.find(x => d.includes(x));
+        if (s) {
+          setFormData({ ...initialFormData, subject: s });
+          setStep('form_pedagogy');
+        }
+      }} onClose={() => setStep('hub')} />}
 
       {/* Sidebar Admin Access */}
       <div className={`fixed inset-y-0 left-0 z-[150] bg-slate-950 border-r border-slate-900 transform transition-all duration-500 shadow-2xl flex flex-col w-80 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
